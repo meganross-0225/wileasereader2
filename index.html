@@ -90,12 +90,31 @@
         }
         .analysis-content {
             font-size: 15px;
-            line-height: 1.5;
+            line-height: 1.7;
             color: #374151;
+        }
+        .analysis-content h2 {
+            font-size: 20px;
+            color: #1F2937;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #E5E7EB;
+        }
+        .analysis-content h3 {
+            font-size: 18px;
+            color: #4B5563;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-weight: 600;
         }
         .analysis-content strong {
             color: #1F2937;
             font-weight: 600;
+        }
+        .analysis-content p {
+            margin-bottom: 12px;
         }
         .disclaimer {
             background: #F9FAFB;
@@ -178,7 +197,7 @@
                             max_tokens: 2000,
                             messages: [{
                                 role: 'user',
-                                content: 'Analyze this Wisconsin residential lease. Be practical and realistic - acknowledge housing shortage. Format with clear sections:\n\n1. BASIC TERMS (rent, deposit, term)\n2. RED FLAGS (mark as UNENFORCEABLE if illegal, or WORTH KNOWING if concerning but legal)\n3. YOUR RIGHTS (brief list)\n4. QUESTIONS TO ASK\n5. TIPS FOR LIVING WITH THIS LEASE\n\nWisconsin law: Non-refundable fees illegal, late fees over 5% unenforceable, 24hr entry notice required, cannot waive habitability/notice rights, deposits returned in 21 days.\n\nEnd with: "Need help? Tenant Resource Center: (608) 257-0006 | Legal Action WI: (608) 256-3304 | Report problems: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx"\n\nLEASE:\n' + state.text
+                                content: 'Analyze this Wisconsin lease. Be CONCISE - use bullet points, short sentences. Focus on what matters most.\n\nFormat:\n\n**RISK LEVEL: [LOW / MODERATE / HIGH / VERY HIGH]**\n[1-2 sentence summary: Is this standard or predatory?]\n\n**BASIC TERMS**\n- Rent: $____ | Due: ____ | Deposit: $____ | Term: ____\n- Late fee: ____ | Utilities: ____\n\n**UNENFORCEABLE (Illegal - you can ignore)**\n[List only if present, with brief note why]\n\n**CONCERNING (Legal but note)**\n[Excessive fees, unfair terms - be specific about amounts]\n\n**YOUR RIGHTS**\n[3-4 key rights not mentioned in lease]\n\n**BOTTOM LINE**\n[2-3 sentences: Main concerns? Standard lease or run? What to prioritize?]\n\nWisconsin law: Non-refundable fees illegal, late fees >5% unenforceable, 24hr entry notice, can\'t waive habitability/notice rights.\n\nEnd with: "Questions? Tenant Resource Center: (608) 257-0006"\n\nLEASE:\n' + state.text
                             }]
                         }
                     })
@@ -190,9 +209,21 @@
                 
                 if (data.content && data.content[0] && data.content[0].text) {
                     let text = data.content[0].text;
+                    
+                    // Convert markdown headers
+                    text = text.replace(/### (.*?)(\n|$)/g, '<h3>$1</h3>');
+                    text = text.replace(/## (.*?)(\n|$)/g, '<h2>$1</h2>');
+                    
+                    // Bold text
                     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                    text = text.replace(/\n\n/g, '<br><br>');
+                    
+                    // Line breaks
+                    text = text.replace(/\n\n/g, '</p><p>');
                     text = text.replace(/\n/g, '<br>');
+                    
+                    // Wrap in paragraph
+                    text = '<p>' + text + '</p>';
+                    
                     state.result = text;
                 } else if (data.error) {
                     throw new Error('API Error: ' + (data.error.message || 'Unknown error'));
