@@ -4,555 +4,212 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wisconsin Lease Reading Tool</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #EFF6FF 0%, #E0E7FF 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
-        * {
-            box-sizing: border-box;
+        .container { max-width: 900px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-bottom: 20px;
         }
+        h1 { font-size: 28px; color: #1F2937; margin-bottom: 10px; text-align: center; }
+        h2 { font-size: 18px; color: #1F2937; margin-top: 15px; margin-bottom: 8px; font-weight: 700; }
+        .subtitle { text-align: center; color: #6B7280; margin-bottom: 30px; }
+        .info-box {
+            background: #EFF6FF;
+            border-left: 4px solid #3B82F6;
+            padding: 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 30px;
+        }
+        .info-box h3 { color: #1E40AF; margin-bottom: 10px; font-size: 16px; }
+        .info-box li { color: #1E40AF; font-size: 14px; margin: 5px 0; list-style: none; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active { background: #4F46E5; color: white; }
+        .tab.inactive { background: #F3F4F6; color: #374151; }
+        .tab.inactive:hover { background: #E5E7EB; }
+        textarea {
+            width: 100%;
+            height: 250px;
+            padding: 15px;
+            border: 2px solid #D1D5DB;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+        }
+        textarea:focus { outline: none; border-color: #4F46E5; }
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #4F46E5; color: white; }
+        .btn-primary:hover { background: #4338CA; }
+        .btn-primary:disabled { background: #D1D5DB; cursor: not-allowed; }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid white;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-box {
+            background: #FEF2F2;
+            border-left: 4px solid #EF4444;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+            color: #991B1B;
+        }
+        .analysis-content {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #374151;
+        }
+        .analysis-content strong {
+            color: #1F2937;
+            font-weight: 600;
+        }
+        .disclaimer {
+            background: #F9FAFB;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0 20px;
+            font-size: 14px;
+            color: #6B7280;
+        }
+        .privacy { text-align: center; margin-top: 30px; font-size: 14px; color: #6B7280; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app"></div>
+    
+    <script>
+        let state = {
+            mode: 'paste',
+            text: '',
+            analyzing: false,
+            result: null,
+            error: null
+        };
 
-    <script type="text/babel">
-        const { useState } = React;
-
-        function LeaseReader() {
-          const [mode, setMode] = useState('upload');
-          const [file, setFile] = useState(null);
-          const [pastedText, setPastedText] = useState('');
-          const [analyzing, setAnalyzing] = useState(false);
-          const [report, setReport] = useState(null);
-          const [error, setError] = useState(null);
-
-          const handleFileChange = (e) => {
-            const selectedFile = e.target.files[0];
-            if (selectedFile) {
-              if (selectedFile.size > 10 * 1024 * 1024) {
-                setError('File is too large. Please use a file under 10MB.');
-                return;
-              }
-              setFile(selectedFile);
-              setError(null);
+        function render() {
+            const app = document.getElementById('app');
+            if (state.result) {
+                app.innerHTML = renderResult();
+            } else {
+                app.innerHTML = renderInput();
             }
-          };
-
-          const analyzeLease = async () => {
-            setAnalyzing(true);
-            setError(null);
-            setReport(null);
-
-            try {
-              let leaseText = '';
-
-              if (mode === 'paste') {
-                leaseText = pastedText;
-              } else if (mode === 'upload' && file) {
-                const base64Data = await new Promise((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onload = () => resolve(reader.result.split(",")[1]);
-                  reader.onerror = () => reject(new Error("Failed to read file"));
-                  reader.readAsDataURL(file);
-                });
-
-                const extractResponse = await fetch("/.netlify/functions/anthropicProxy", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    anthropicRequest: {
-                      model: "claude-3-5-sonnet-20240620",
-                      max_tokens: 3000,
-                      messages: [{
-                        role: "user",
-                        content: [
-                          {
-                            type: file.type === 'application/pdf' ? 'document' : 'image',
-                            source: {
-                              type: "base64",
-                              media_type: file.type,
-                              data: base64Data,
-                            }
-                          },
-                          {
-                            type: "text",
-                            text: "Extract all text from this document. Return just the text."
-                          }
-                        ]
-                      }]
-                    }
-                  })
-                });
-
-                if (!extractResponse.ok) throw new Error("Failed to extract text");
-                const extractData = await extractResponse.json();
-                leaseText = extractData.content[0].text;
-              }
-
-              const analysisResponse = await fetch("/.netlify/functions/anthropicProxy", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  anthropicRequest: {
-                    model: "claude-3-5-sonnet-20240620",
-                    max_tokens: 2500,
-                    messages: [{
-                      role: "user",
-                      content: `Analyze this Wisconsin lease. Be concise.
-
-Format:
-
-KEY LEASE TERMS
-[Rent, term, deposit, utilities - 2-3 sentences]
-
-RED FLAGS
-[List problems. Start critical/illegal issues with "⚠️ CRITICAL:" Include statute citations.]
-
-YOUR TENANT RIGHTS
-You have these rights in Wisconsin, even if your lease doesn't mention them:
-- **Right to a habitable home**: Landlord must maintain property (heat, water, electricity, plumbing, safety)
-- **Right to repairs**: You can request repairs in writing; landlord must respond within a reasonable time
-- **Limits on fees and penalties**: Some charges are illegal or limited by law
-- **Security deposit protections**: Rules for how much can be charged, what can be deducted, and when it must be returned
-- **Protection from retaliation**: Cannot evict for reporting violations or requesting repairs
-- **Proper eviction process**: Must follow legal procedures, cannot lock you out
-
-QUESTIONS TO ASK
-[5 specific questions]
-
-OVERALL ASSESSMENT
-Risk Level: [LOW/MODERATE/HIGH]
-[2-3 sentences: standard lease? concerns? priorities?]
-
-Lease: ${leaseText}`
-                    }]
-                  }
-                })
-              });
-
-              if (!analysisResponse.ok) throw new Error("Analysis failed");
-              const analysisData = await analysisResponse.json();
-              setReport(analysisData.content[0].text);
-
-            } catch (err) {
-              setError(err.message || "An error occurred. Please try again.");
-            } finally {
-              setAnalyzing(false);
-            }
-          };
-
-          const formatTextWithBold = (text) => {
-            if (!text) return null;
-            
-            const lines = text.split('\n');
-            return lines.map((line, lineIndex) => {
-              const trimmedLine = line.trim();
-              
-              if (trimmedLine.length > 3 && trimmedLine === trimmedLine.toUpperCase() && /^[A-Z\s]+$/.test(trimmedLine)) {
-                return React.createElement('h2', {
-                  key: lineIndex,
-                  style: { 
-                    fontSize: '1.75rem', 
-                    fontWeight: 700, 
-                    color: '#111827', 
-                    marginTop: '2rem', 
-                    marginBottom: '1rem',
-                    borderBottom: '2px solid #e5e7eb',
-                    paddingBottom: '0.5rem'
-                  }
-                }, trimmedLine);
-              }
-              
-              if (trimmedLine.startsWith('⚠️ CRITICAL:')) {
-                const contentAfterMarker = line.substring(line.indexOf('⚠️ CRITICAL:') + 12);
-                const parts = [];
-                let currentIndex = 0;
-                const boldRegex = /\*\*(.*?)\*\*/g;
-                let match;
-                
-                while ((match = boldRegex.exec(contentAfterMarker)) !== null) {
-                  if (match.index > currentIndex) {
-                    parts.push(contentAfterMarker.substring(currentIndex, match.index));
-                  }
-                  parts.push(React.createElement('strong', {
-                    key: `${lineIndex}-${match.index}`,
-                    style: { fontWeight: 700 }
-                  }, match[1]));
-                  currentIndex = match.index + match[0].length;
-                }
-                
-                if (currentIndex < contentAfterMarker.length) {
-                  parts.push(contentAfterMarker.substring(currentIndex));
-                }
-                
-                return React.createElement('div', {
-                  key: lineIndex,
-                  style: {
-                    background: '#fef2f2',
-                    border: '2px solid #fca5a5',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    marginBottom: '1rem',
-                    marginTop: '0.5rem'
-                  }
-                }, React.createElement('div', {
-                  style: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }
-                }, [
-                  React.createElement('span', { key: 'icon', style: { fontSize: '1.25rem', flexShrink: 0 }}, '⚠️'),
-                  React.createElement('div', { key: 'content', style: { color: '#991b1b', fontWeight: 600 }}, [
-                    React.createElement('strong', { key: 'label' }, 'CRITICAL: '),
-                    ...(parts.length > 0 ? parts : [contentAfterMarker])
-                  ])
-                ]));
-              }
-              
-              const parts = [];
-              let currentIndex = 0;
-              const boldRegex = /\*\*(.*?)\*\*/g;
-              let match;
-              
-              while ((match = boldRegex.exec(line)) !== null) {
-                if (match.index > currentIndex) {
-                  parts.push(line.substring(currentIndex, match.index));
-                }
-                parts.push(React.createElement('strong', {
-                  key: `${lineIndex}-${match.index}`,
-                  style: { fontWeight: 700, color: '#111827' }
-                }, match[1]));
-                currentIndex = match.index + match[0].length;
-              }
-              
-              if (currentIndex < line.length) {
-                parts.push(line.substring(currentIndex));
-              }
-              
-              if (trimmedLine === '') {
-                return React.createElement('div', { key: lineIndex, style: { height: '0.5rem' }});
-              }
-              
-              if (trimmedLine.startsWith('-') || trimmedLine.startsWith('•')) {
-                const bulletText = trimmedLine.startsWith('-') ? trimmedLine.substring(1).trim() : trimmedLine.substring(1).trim();
-                
-                const bulletParts = [];
-                let currentIdx = 0;
-                const regex = /\*\*(.*?)\*\*/g;
-                let m;
-                
-                while ((m = regex.exec(bulletText)) !== null) {
-                  if (m.index > currentIdx) {
-                    bulletParts.push(bulletText.substring(currentIdx, m.index));
-                  }
-                  bulletParts.push(React.createElement('strong', {
-                    key: `${lineIndex}-bullet-${m.index}`,
-                    style: { fontWeight: 700, color: '#111827' }
-                  }, m[1]));
-                  currentIdx = m.index + m[0].length;
-                }
-                
-                if (currentIdx < bulletText.length) {
-                  bulletParts.push(bulletText.substring(currentIdx));
-                }
-                
-                return React.createElement('div', {
-                  key: lineIndex,
-                  style: { 
-                    marginBottom: '0.5rem',
-                    marginLeft: '1.5rem',
-                    display: 'flex',
-                    gap: '0.5rem'
-                  }
-                }, [
-                  React.createElement('span', { key: 'bullet', style: { flexShrink: 0 }}, '•'),
-                  React.createElement('div', { key: 'content' }, bulletParts.length > 0 ? bulletParts : bulletText)
-                ]);
-              }
-              
-              return React.createElement('div', {
-                key: lineIndex,
-                style: { marginBottom: '0.5rem' }
-              }, parts.length > 0 ? parts : line);
-            });
-          };
-
-          return React.createElement('div', {
-            style: {
-              minHeight: '100vh',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              padding: '3rem 1rem'
-            }
-          }, React.createElement('div', {
-            style: { maxWidth: '56rem', margin: '0 auto' }
-          }, React.createElement('div', {
-            style: {
-              background: 'white',
-              borderRadius: '1rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-              overflow: 'hidden'
-            }
-          }, [
-            React.createElement('div', {
-              key: 'header',
-              style: {
-                background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
-                padding: '2rem',
-                color: 'white'
-              }
-            }, [
-              React.createElement('h1', {
-                key: 'title',
-                style: {
-                  fontSize: '2.25rem',
-                  fontWeight: 'bold',
-                  marginBottom: '0.5rem',
-                  margin: 0
-                }
-              }, 'Wisconsin Lease Reading Tool'),
-              React.createElement('p', {
-                key: 'subtitle',
-                style: {
-                  fontSize: '1.125rem',
-                  opacity: 0.9,
-                  margin: '0.5rem 0 0 0'
-                }
-              }, 'Understand your lease and know your rights')
-            ]),
-            
-            React.createElement('div', {
-              key: 'content',
-              style: { padding: '2rem' }
-            }, !report ? [
-              React.createElement('div', {
-                key: 'tabs',
-                style: { display: 'flex', gap: '0.75rem', marginBottom: '2rem' }
-              }, [
-                React.createElement('button', {
-                  key: 'upload-tab',
-                  onClick: () => setMode('upload'),
-                  style: {
-                    flex: 1,
-                    padding: '1rem 1.5rem',
-                    borderRadius: '0.75rem',
-                    fontWeight: '600',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: mode === 'upload' ? '#4f46e5' : '#f3f4f6',
-                    color: mode === 'upload' ? 'white' : '#374151'
-                  }
-                }, 'Upload Photo/PDF'),
-                React.createElement('button', {
-                  key: 'paste-tab',
-                  onClick: () => setMode('paste'),
-                  style: {
-                    flex: 1,
-                    padding: '1rem 1.5rem',
-                    borderRadius: '0.75rem',
-                    fontWeight: '600',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: mode === 'paste' ? '#4f46e5' : '#f3f4f6',
-                    color: mode === 'paste' ? 'white' : '#374151'
-                  }
-                }, 'Paste Text')
-              ]),
-              
-              mode === 'upload' ? React.createElement('div', {
-                key: 'upload-mode',
-                style: { marginBottom: '2rem' }
-              }, React.createElement('div', {
-                style: {
-                  border: '3px dashed #d1d5db',
-                  borderRadius: '1rem',
-                  padding: '4rem 2rem',
-                  textAlign: 'center'
-                }
-              }, [
-                React.createElement('input', {
-                  key: 'file-input',
-                  type: 'file',
-                  accept: 'image/*,.pdf',
-                  onChange: handleFileChange,
-                  style: { display: 'none' },
-                  id: 'file-upload'
-                }),
-                React.createElement('label', {
-                  key: 'file-label',
-                  htmlFor: 'file-upload',
-                  style: { cursor: 'pointer' }
-                }, [
-                  React.createElement('div', {
-                    key: 'upload-text',
-                    style: {
-                      fontSize: '1.25rem',
-                      color: '#4f46e5',
-                      fontWeight: '600',
-                      marginBottom: '0.5rem'
-                    }
-                  }, 'Click to upload lease'),
-                  React.createElement('div', {
-                    key: 'drag-text',
-                    style: { color: '#6b7280', marginBottom: '0.5rem' }
-                  }, 'or drag and drop'),
-                  React.createElement('div', {
-                    key: 'format-text',
-                    style: { color: '#9ca3af', fontSize: '0.875rem' }
-                  }, 'PNG, JPG, or PDF (max 10MB)')
-                ]),
-                file && React.createElement('div', {
-                  key: 'file-name',
-                  style: {
-                    marginTop: '1.5rem',
-                    padding: '1rem',
-                    background: '#ecfdf5',
-                    border: '1px solid #a7f3d0',
-                    borderRadius: '0.5rem',
-                    display: 'inline-block',
-                    color: '#065f46',
-                    fontWeight: '600'
-                  }
-                }, '✓ ' + file.name)
-              ])) : React.createElement('div', {
-                key: 'paste-mode',
-                style: { marginBottom: '2rem' }
-              }, [
-                React.createElement('label', {
-                  key: 'textarea-label',
-                  style: {
-                    display: 'block',
-                    fontWeight: '600',
-                    marginBottom: '0.75rem',
-                    fontSize: '1.125rem'
-                  }
-                }, 'Paste your lease text here:'),
-                React.createElement('textarea', {
-                  key: 'textarea',
-                  value: pastedText,
-                  onChange: (e) => setPastedText(e.target.value),
-                  style: {
-                    width: '100%',
-                    height: '20rem',
-                    padding: '1.25rem',
-                    border: '2px solid #d1d5db',
-                    borderRadius: '0.75rem',
-                    fontSize: '1rem',
-                    fontFamily: 'monospace'
-                  },
-                  placeholder: 'Paste your lease text here...'
-                }),
-                React.createElement('div', {
-                  key: 'char-count',
-                  style: {
-                    marginTop: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#6b7280'
-                  }
-                }, pastedText.length + ' characters (' + (pastedText.length >= 100 ? '✓ Ready' : 'Need ' + (100 - pastedText.length) + ' more') + ')')
-              ]),
-              
-              error && React.createElement('div', {
-                key: 'error',
-                style: {
-                  marginBottom: '1.5rem',
-                  padding: '1.25rem',
-                  background: '#fef2f2',
-                  border: '2px solid #fecaca',
-                  borderRadius: '0.75rem',
-                  color: '#991b1b'
-                }
-              }, error),
-              
-              React.createElement('button', {
-                key: 'analyze-button',
-                onClick: analyzeLease,
-                disabled: !((mode === 'upload' && file) || (mode === 'paste' && pastedText.length > 100)) || analyzing,
-                style: {
-                  width: '100%',
-                  padding: '1.25rem',
-                  borderRadius: '0.75rem',
-                  fontWeight: '700',
-                  fontSize: '1.25rem',
-                  border: 'none',
-                  cursor: ((mode === 'upload' && file) || (mode === 'paste' && pastedText.length > 100)) && !analyzing ? 'pointer' : 'not-allowed',
-                  background: ((mode === 'upload' && file) || (mode === 'paste' && pastedText.length > 100)) && !analyzing ? 'linear-gradient(to right, #4f46e5, #7c3aed)' : '#d1d5db',
-                  color: 'white'
-                }
-              }, analyzing ? 'Analyzing... (20-40 seconds)' : 'Analyze My Lease'),
-              
-              React.createElement('div', {
-                key: 'privacy',
-                style: {
-                  marginTop: '2rem',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  color: '#6b7280'
-                }
-              }, '🔒 Your files are analyzed and immediately deleted. This provides educational information, not legal advice.')
-            ] : [
-              React.createElement('button', {
-                key: 'reset-button',
-                onClick: () => {
-                  setReport(null);
-                  setFile(null);
-                  setPastedText('');
-                  setError(null);
-                },
-                style: {
-                  marginBottom: '1.5rem',
-                  color: '#4f46e5',
-                  fontWeight: '600',
-                  fontSize: '1.125rem',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer'
-                }
-              }, '← Analyze Another Lease'),
-              
-              React.createElement('div', {
-                key: 'report',
-                style: {
-                  background: 'linear-gradient(to bottom right, #f9fafb, #f3f4f6)',
-                  borderRadius: '0.75rem',
-                  padding: '2rem',
-                  border: '1px solid #e5e7eb',
-                  marginBottom: '1.5rem',
-                  fontSize: '1rem',
-                  lineHeight: '1.75',
-                  color: '#1f2937'
-                }
-              }, formatTextWithBold(report)),
-              
-              React.createElement('div', {
-                key: 'disclaimer',
-                style: {
-                  padding: '1.5rem',
-                  background: '#fefce8',
-                  border: '2px solid #fde047',
-                  borderRadius: '0.75rem',
-                  fontSize: '0.875rem',
-                  color: '#713f12'
-                }
-              }, [
-                React.createElement('strong', { key: 'important' }, 'Important: '),
-                'This analysis is for educational purposes only and does not constitute legal advice. For specific legal guidance, consult with a Wisconsin tenant rights attorney or contact the ',
-                React.createElement('a', {
-                  key: 'link',
-                  href: 'https://www.tenantresourcecenter.org/',
-                  target: '_blank',
-                  rel: 'noopener noreferrer',
-                  style: { textDecoration: 'underline', fontWeight: '600' }
-                }, 'Tenant Resource Center'),
-                '.'
-              ])
-            ])
-          ])));
+            attachEventListeners();
         }
 
-        ReactDOM.render(React.createElement(LeaseReader), document.getElementById('root'));
+        function renderInput() {
+            const errorDisplay = state.error ? '<div class="error-box">' + state.error + '</div>' : '';
+            const canAnalyze = state.text.trim().length > 50;
+            const btnDisabled = !canAnalyze || state.analyzing ? 'disabled' : '';
+
+            return '<div class="container"><div class="card"><h1>Wisconsin Lease Reading Tool</h1><div class="subtitle">Understand your lease and know your rights</div><div class="info-box"><h3>What this tool does:</h3><li>Explains your lease in plain English</li><li>Identifies illegal or unenforceable clauses</li><li>Shows you rights your landlord didn\'t mention</li><li>Suggests questions to ask before signing</li></div><div><label style="display: block; font-weight: 600; margin-bottom: 10px;">Paste your lease text here:</label><textarea id="leaseText" placeholder="Copy and paste your lease text here. Include rent amount, deposit, rules, etc.">' + state.text + '</textarea><div style="font-size: 14px; color: #6B7280; margin-top: 10px;">' + (state.text.length > 0 ? state.text.length + ' characters' : 'Paste lease text above') + '</div></div>' + errorDisplay + '<button class="btn btn-primary" onclick="analyze()" ' + btnDisabled + ' style="margin-top: 20px;">' + (state.analyzing ? '<span class="spinner"></span> Analyzing your lease...' : 'Analyze My Lease') + '</button><div class="privacy"><div>Your privacy matters. Text is analyzed and immediately deleted.</div><div style="margin-top: 5px;">This tool provides educational information, not legal advice.</div></div></div></div>';
+        }
+
+        function renderResult() {
+            return '<div class="container"><div class="card"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;"><h1 style="text-align: left; margin: 0;">Lease Analysis Report</h1><button class="tab inactive" onclick="resetApp()" style="width: auto; padding: 10px 20px;">New Analysis</button></div><div class="analysis-content">' + state.result + '</div><div class="disclaimer"><div style="margin-bottom: 10px;"><strong>Important:</strong> This tool provides educational information, not legal advice.</div><div><strong>For specific legal questions, contact:</strong></div><div style="margin-top: 5px;">Tenant Resource Center: (608) 257-0006</div><div>Legal Action of Wisconsin: (608) 256-3304</div><div>Report housing problems: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx</div><div>If threatened with eviction, call EDDP immediately</div></div></div></div>';
+        }
+
+        function resetApp() {
+            state = {
+                mode: 'paste',
+                text: '',
+                analyzing: false,
+                result: null,
+                error: null
+            };
+            render();
+        }
+
+        function attachEventListeners() {
+            const textarea = document.getElementById('leaseText');
+            if (textarea) {
+                textarea.oninput = function(e) {
+                    state.text = e.target.value;
+                    render();
+                };
+            }
+        }
+
+        async function analyze() {
+            state.analyzing = true;
+            state.error = null;
+            render();
+
+            try {
+                const response = await fetch('/.netlify/functions/anthropicProxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        anthropicRequest: {
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 4000,
+                            messages: [{
+                                role: 'user',
+                                content: 'You are a Wisconsin tenant rights expert providing practical, realistic lease analysis. Your goal is EDUCATION about rights and informed decision-making, not discouraging people from signing.\n\nTONE: Realistic and empowering. Acknowledge housing shortage. Focus on "know what you\'re signing" not "don\'t sign this." Help tenants make informed choices and know their rights AFTER they move in.\n\nInclude these sections:\n\n1. BASIC TERMS\nExtract: rent amount, due date, late fee, security deposit, lease term, utilities\n\n2. KNOW BEFORE YOU SIGN\nCategorize issues as:\n\nUNENFORCEABLE (You can ignore these even after signing):\n- Non-refundable fees - illegal in Wisconsin, you can refuse to pay\n- Waiving notice rights - unenforceable, you still have these rights\n- Waiving habitability rights - unenforceable, landlord must maintain property\n- Entry without 24hr notice (except emergencies) - unenforceable\n- Late fees over 5% of monthly rent - unenforceable\n\nIMPORTANT TO UNDERSTAND (Legal but know what you\'re agreeing to):\n- Joint and several liability - explain what this means (each tenant responsible for full rent)\n- Automatic renewal terms - set calendar reminders\n- Insurance requirements - note if $15/month seems reasonable vs finding your own (renters insurance typically $10-20/month)\n- Excessive fees - note amounts, compare to typical costs\n- 12-hour entry notice - Wisconsin requires reasonable notice (typically 24 hours), but this may not be worth fighting over\n\n3. MISSING RIGHTS YOU STILL HAVE\nBrief list of key Wisconsin rights not mentioned in lease\n\n4. QUESTIONS TO ASK\nPractical questions about unclear terms, not demands to change lease\n\n5. LIVING WITH THIS LEASE\nTips for:\n- Documenting everything from day 1\n- Maintaining good landlord relationship while knowing your rights\n- When/how to assert rights if problems arise\n- Where to get help if needed\n\n6. YOUR RIGHTS SUMMARY\nAlways end with this section:\n"KNOW YOUR RIGHTS - Quick Reference\n- You cannot waive your right to habitable housing\n- Landlords must give reasonable notice before entry (typically 24 hours)\n- Security deposits must be returned within 21 days\n- You cannot be retaliated against for requesting repairs\n- Non-refundable fees are illegal - you can refuse to pay them\n\nNeed help?\n- Tenant Resource Center: (608) 257-0006\n- Legal Action of Wisconsin: (608) 256-3304\n- If facing eviction: EDDP provides free legal help\n- Madison Building Inspection: (608) 266-4551\n- Report housing problems to City of Madison: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx"\n\nLEASE TEXT:\n' + state.text
+                            }]
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                console.log('API Response:', data);
+                
+                if (data.content && data.content[0] && data.content[0].text) {
+                    let text = data.content[0].text;
+                    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    text = text.replace(/\n\n/g, '<br><br>');
+                    text = text.replace(/\n/g, '<br>');
+                    state.result = text;
+                } else if (data.error) {
+                    throw new Error('API Error: ' + (data.error.message || 'Unknown error'));
+                } else {
+                    console.error('Full response:', data);
+                    throw new Error('No content in response. Check console for details.');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                state.error = err.message || 'Failed to analyze lease. Please try again.';
+            }
+
+            state.analyzing = false;
+            render();
+        }
+
+        render();
     </script>
 </body>
 </html>
