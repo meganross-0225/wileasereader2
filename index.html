@@ -154,11 +154,43 @@
             const canAnalyze = state.text.trim().length > 50;
             const btnDisabled = !canAnalyze || state.analyzing ? 'disabled' : '';
 
-            return '<div class="container"><div class="card"><h1>Wisconsin Lease Reading Tool</h1><div class="subtitle">Understand your lease and know your rights</div><div class="info-box"><h3>What this tool does:</h3><li>Explains your lease in plain English</li><li>Identifies illegal or unenforceable clauses</li><li>Shows you rights your landlord didn\'t mention</li><li>Suggests questions to ask before signing</li></div><div><label style="display: block; font-weight: 600; margin-bottom: 10px;">Paste your lease text here:</label><textarea id="leaseText" placeholder="Copy and paste your lease text here. Include rent amount, deposit, rules, etc.">' + state.text + '</textarea><div style="font-size: 14px; color: #6B7280; margin-top: 10px;">' + (state.text.length > 0 ? state.text.length + ' characters' : 'Paste lease text above') + '</div></div>' + errorDisplay + '<button class="btn btn-primary" onclick="analyze()" ' + btnDisabled + ' style="margin-top: 20px;">' + (state.analyzing ? '<span class="spinner"></span> Analyzing your lease...' : 'Analyze My Lease') + '</button><div class="privacy"><div>Your privacy matters. Text is analyzed and immediately deleted.</div><div style="margin-top: 5px;">This tool provides educational information, not legal advice.</div></div></div></div>';
+            return '<div class="container"><div class="card"><h1>Wisconsin Lease Reading Tool</h1><div class="subtitle">Understand what you\'re signing and know your Wisconsin tenant rights.</div><div><label style="display: block; font-weight: 600; margin-bottom: 10px;">Paste your lease text here:</label><textarea id="leaseText" placeholder="Copy and paste your lease text here. Include rent amount, deposit, rules, etc.">' + state.text + '</textarea><div style="font-size: 14px; color: #6B7280; margin-top: 10px;">' + state.text.length + ' characters</div></div>' + errorDisplay + '<button class="btn btn-primary" onclick="analyze()" ' + btnDisabled + ' style="margin-top: 20px;">' + (state.analyzing ? '<span class="spinner"></span> Analyzing your lease...' : 'Analyze My Lease') + '</button><div class="privacy"><div>Your privacy matters. Text is analyzed and immediately deleted. This tool provides educational information, not legal advice.</div></div></div></div>';
         }
 
         function renderResult() {
-            return '<div class="container"><div class="card"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;"><h1 style="text-align: left; margin: 0;">Lease Analysis Report</h1><button class="tab inactive" onclick="resetApp()" style="width: auto; padding: 10px 20px;">New Analysis</button></div><div class="analysis-content">' + state.result + '</div><div class="disclaimer"><div style="margin-bottom: 10px;"><strong>Important:</strong> This tool provides educational information, not legal advice.</div><div><strong>For specific legal questions, contact:</strong></div><div style="margin-top: 5px;">Tenant Resource Center: (608) 257-0006</div><div>Legal Action of Wisconsin: (608) 256-3304</div><div>Report housing problems: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx</div><div>If threatened with eviction, call EDDP immediately</div></div></div></div>';
+            return '<div class="container"><div class="card"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;"><h1 style="text-align: left; margin: 0;">Lease Analysis Report</h1><div style="display: flex; gap: 10px;"><button class="tab inactive" onclick="downloadReport()" style="width: auto; padding: 10px 20px;">Download Report</button><button class="tab inactive" onclick="resetApp()" style="width: auto; padding: 10px 20px;">New Analysis</button></div></div><div class="analysis-content">' + state.result + '</div><div class="disclaimer"><div style="margin-bottom: 10px;"><strong>Important:</strong> This tool provides educational information, not legal advice.</div><div><strong>For specific legal questions, contact:</strong></div><div style="margin-top: 5px;">Tenant Resource Center: (608) 257-0006</div><div>Legal Action of Wisconsin: (608) 256-3304</div><div>Report housing problems: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx</div><div>If threatened with eviction, call EDDP immediately</div></div></div></div>';
+        }
+
+        function downloadReport() {
+            // Create a clean text version of the report
+            let reportText = 'WISCONSIN LEASE ANALYSIS REPORT\n';
+            reportText += 'Generated: ' + new Date().toLocaleDateString() + '\n\n';
+            reportText += '='.repeat(60) + '\n\n';
+            
+            // Strip HTML tags for clean text
+            let cleanText = state.result.replace(/<[^>]*>/g, '');
+            cleanText = cleanText.replace(/&nbsp;/g, ' ');
+            cleanText = cleanText.replace(/&amp;/g, '&');
+            
+            reportText += cleanText;
+            reportText += '\n\n' + '='.repeat(60) + '\n\n';
+            reportText += 'DISCLAIMER\n';
+            reportText += 'This tool provides educational information, not legal advice.\n\n';
+            reportText += 'For specific legal questions, contact:\n';
+            reportText += '- Tenant Resource Center: (608) 257-0006\n';
+            reportText += '- Legal Action of Wisconsin: (608) 256-3304\n';
+            reportText += '- Report housing problems: https://elam.cityofmadison.com/CitizenAccess/COMLicensesPermits.aspx\n';
+            
+            // Create download
+            const blob = new Blob([reportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'lease-analysis-' + new Date().toISOString().split('T')[0] + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function resetApp() {
@@ -197,7 +229,7 @@
                             max_tokens: 2000,
                             messages: [{
                                 role: 'user',
-                                content: 'Analyze this Wisconsin lease. Be CONCISE - use bullet points, short sentences. Focus on what matters most.\n\nFormat:\n\n**RISK LEVEL: [LOW / MODERATE / HIGH / VERY HIGH]**\n[1-2 sentence summary: Is this standard or predatory?]\n\n**BASIC TERMS**\n- Rent: $____ | Due: ____ | Deposit: $____ | Term: ____\n- Late fee: ____ | Utilities: ____\n\n**UNENFORCEABLE (Illegal - you can ignore)**\n[List only if present, with brief note why]\n\n**CONCERNING (Legal but note)**\n[Excessive fees, unfair terms - be specific about amounts]\n\n**YOUR RIGHTS**\n[3-4 key rights not mentioned in lease]\n\n**BOTTOM LINE**\n[2-3 sentences: Main concerns? Standard lease or run? What to prioritize?]\n\nWisconsin law: Non-refundable fees illegal, late fees >5% unenforceable, 24hr entry notice, can\'t waive habitability/notice rights.\n\nEnd with: "Questions? Tenant Resource Center: (608) 257-0006"\n\nLEASE:\n' + state.text
+                                content: 'Analyze this Wisconsin lease. Be CONCISE - bullet points, short sentences.\n\nFirst, scan for property location. If you find Madison or Milwaukee in the address, apply city-specific laws.\n\nFormat:\n\n**RISK LEVEL: [LOW / MODERATE / HIGH / VERY HIGH]**\n[1-2 sentence summary]\n\n**BASIC TERMS**\nProperty location: [city if found, else "Not specified"]\nRent: $____ per month\nDue: [date] of each month\nLease term: [dates]\nSecurity deposit: $____\nMaximum legal late fee: $____ (5% of monthly rent)\nYour lease\'s late fee: $____ [if over 5%, add "⚠️ ILLEGAL - you only owe $____ max" | if under 5%, add "✓ Legal"]\nUtilities: [who pays what]\nMaintenance contact: [name/number if listed]\nLandlord contact: [name/address if listed]\n\n**UNENFORCEABLE (Illegal - you can ignore)**\n- [List violations found]\n- MADISON SPECIFIC: Flag "No Section 8" as illegal, note security deposit interest required\n- MILWAUKEE SPECIFIC: Flag "No housing vouchers" as illegal\n- ADA: Flag service/assistance animal bans, modification restrictions, disability disclosure requirements\n\n**CONCERNING (Legal but note)**\n- [Excessive fees, unfair terms with specific amounts]\n\n**YOUR RIGHTS IN WISCONSIN**\n- Right to habitable housing - Landlord must maintain heat, water, electricity, plumbing, and safe conditions (cannot be waived)\n- Proper eviction process required - Landlord must give written notice (5-day for non-payment, 14-day for lease violations) and cannot lock you out\n- Security deposit protections - Must be returned within 21 days with itemized deductions, or you can sue for double damages\n- Late fees limited to 5% of monthly rent - Higher fees are unenforceable even if you signed\n- Protection from retaliation - Landlord cannot evict you for requesting repairs or reporting code violations\n[IF MADISON: Add "- Rent abatement rights for uninhabitable conditions - Madison has formal process"]\n[IF MADISON: Add "- Security deposit interest - Landlord must pay interest on deposits"]\n\n**BOTTOM LINE**\n[2-3 sentences: Main concerns? Standard or predatory? What to watch?]\n\n[IF NO CITY DETECTED: Add "Note: Madison and Milwaukee have additional tenant protections beyond state law. If your property is in one of these cities, you may have more rights than listed here."]\n\nEnd with: "Questions? Tenant Resource Center: (608) 257-0006"\n\nLEASE:\n' + state.text
                             }]
                         }
                     })
@@ -210,38 +242,31 @@
                 if (data.content && data.content[0] && data.content[0].text) {
                     let text = data.content[0].text;
                     
+                    // Remove any remaining ** markdown that wasn't caught
+                    text = text.replace(/\*\*/g, '');
+                    
                     // Add styling to RISK LEVEL
-                    text = text.replace(/\*\*RISK LEVEL: (LOW|MODERATE|HIGH|VERY HIGH)\*\*/g, function(match, level) {
+                    text = text.replace(/RISK LEVEL: (LOW|MODERATE|HIGH|VERY HIGH)/g, function(match, level) {
                         let color = '#10B981'; // green for LOW
                         if (level === 'MODERATE') color = '#F59E0B'; // orange
                         if (level === 'HIGH') color = '#EF4444'; // red
                         if (level === 'VERY HIGH') color = '#DC2626'; // dark red
-                        return '<div style="background: ' + color + '; color: white; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: 700; margin: 20px 0;">⚠️ RISK LEVEL: ' + level + '</div>';
+                        return '<div style="background: ' + color + '; color: white; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: 700; margin: 20px 0; text-align: center;">⚠️ RISK LEVEL: ' + level + '</div>';
                     });
                     
-                    // Style section headers
-                    text = text.replace(/\*\*BASIC TERMS\*\*/g, '<h2 style="color: #4F46E5;">📋 BASIC TERMS</h2>');
-                    text = text.replace(/\*\*UNENFORCEABLE/g, '<h2 style="color: #DC2626;">🚫 UNENFORCEABLE');
-                    text = text.replace(/\*\*CONCERNING/g, '<h2 style="color: #F59E0B;">⚠️ CONCERNING');
-                    text = text.replace(/\*\*YOUR RIGHTS\*\*/g, '<h2 style="color: #10B981;">✓ YOUR RIGHTS</h2>');
-                    text = text.replace(/\*\*BOTTOM LINE\*\*/g, '<h2 style="color: #6366F1;">💡 BOTTOM LINE</h2>');
-                    
-                    // Convert markdown headers
-                    text = text.replace(/### (.*?)(\n|$)/g, '<h3>$1</h3>');
-                    text = text.replace(/## (.*?)(\n|$)/g, '<h2>$1</h2>');
-                    
-                    // Bold text
-                    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    // Style section headers (before converting to h2)
+                    text = text.replace(/BASIC TERMS/g, '<h2 style="color: #4F46E5; margin-top: 25px;">📋 BASIC TERMS</h2><div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 15px 0;">');
+                    text = text.replace(/UNENFORCEABLE/g, '</div><h2 style="color: #DC2626; margin-top: 25px;">🚫 UNENFORCEABLE');
+                    text = text.replace(/CONCERNING/g, '<h2 style="color: #F59E0B; margin-top: 25px;">⚠️ CONCERNING');
+                    text = text.replace(/YOUR RIGHTS/g, '<h2 style="color: #10B981; margin-top: 25px;">✓ YOUR RIGHTS');
+                    text = text.replace(/BOTTOM LINE/g, '<h2 style="color: #6366F1; margin-top: 25px;">💡 BOTTOM LINE');
                     
                     // Bullet points with better styling
-                    text = text.replace(/^- (.+)$/gm, '<div style="margin: 8px 0 8px 20px; display: flex; gap: 8px;"><span style="color: #4F46E5;">•</span><span>$1</span></div>');
+                    text = text.replace(/^- (.+)$/gm, '<div style="margin: 5px 0; padding-left: 20px;">• $1</div>');
                     
-                    // Line breaks
-                    text = text.replace(/\n\n/g, '</p><p>');
+                    // Line breaks - less aggressive
+                    text = text.replace(/\n\n/g, '<br><br>');
                     text = text.replace(/\n/g, '<br>');
-                    
-                    // Wrap in paragraph
-                    text = '<p>' + text + '</p>';
                     
                     state.result = text;
                 } else if (data.error) {
